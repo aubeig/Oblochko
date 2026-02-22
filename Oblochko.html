@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Облочко</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --accent-primary: #a855f7;
+            --accent-glow: rgba(168, 85, 247, 0.4);
+            --glass-bg: rgba(20, 20, 20, 0.82);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --ease-origin: cubic-bezier(0.19, 1, 0.22, 1);
+            --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --charge-green: #34d399;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            color: white;
+            overflow: hidden;
+            background: radial-gradient(circle at 50% -20%, #1a1a2e 0%, #000 80%);
+        }
+
+        .island-wrapper {
+            position: fixed;
+            top: 15px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            z-index: 1000;
+            perspective: 1000px;
+            pointer-events: none;
+        }
+
+        .island {
+            pointer-events: auto;
+            background: var(--glass-bg);
+            backdrop-filter: blur(30px) saturate(160%);
+            -webkit-backdrop-filter: blur(30px) saturate(160%);
+            border: 0.5px solid var(--glass-border);
+            border-radius: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 
+                width 0.55s var(--ease-origin), 
+                height 0.55s var(--ease-origin), 
+                border-radius 0.55s var(--ease-origin),
+                transform 0.4s ease,
+                background-color 0.4s ease;
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.9), inset 0 1px 1px rgba(255, 255, 255, 0.12);
+            cursor: pointer;
+            overflow: hidden;
+            position: relative;
+            transform: translateY(-80px) scale(0.6);
+            opacity: 0;
+        }
+
+        .island.ready { transform: translateY(0) scale(1); opacity: 1; }
+
+        /* Эффект рассеивания (Ripple) */
+        .ripple {
+            position: absolute;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            transform: scale(0);
+            animation: ripple-animation 0.8s ease-out;
+            pointer-events: none;
+            opacity: 0.3;
+            filter: blur(15px);
+        }
+
+        @keyframes ripple-animation {
+            to { transform: scale(4); opacity: 0; }
+        }
+
+        /* Состояния размеров */
+        .state-idle { width: 125px; height: 38px; }
+        .state-music { width: 340px; height: 84px; border-radius: 36px; }
+        .state-notif { width: 360px; height: 96px; border-radius: 38px; }
+        .state-focus { width: 220px; height: 48px; border-radius: 24px; border-color: var(--accent-primary); }
+        .state-faceid { width: 60px; height: 60px; border-radius: 24px; }
+        .state-timer { width: 220px; height: 60px; border-radius: 30px; }
+        .state-charge { width: 240px; height: 50px; border-radius: 25px; }
+
+        /* Контент */
+        .content {
+            width: 100%;
+            height: 100%;
+            display: none;
+            align-items: center;
+            padding: 0 18px;
+            opacity: 0;
+            transform: scale(0.9) translateY(5px);
+            transition: opacity 0.3s ease 0.1s, transform 0.4s var(--ease-elastic) 0.1s;
+            white-space: nowrap;
+        }
+
+        .island.active-content .content.visible {
+            display: flex;
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+
+        /* Idle */
+        .content-idle { justify-content: space-around; }
+        .dot { 
+            width: 7px; height: 7px; border-radius: 50%; 
+            background: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        /* --- МУЗЫКА (крутящаяся обложка + аудиоплеер) --- */
+        @keyframes rotate-art {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .music-art {
+            width: 54px; height: 54px; border-radius: 50%;
+            background-size: cover;
+            background-position: center;
+            /* ⬇️⬇️⬇️ СЮДА ВСТАВЬТЕ ССЫЛКУ НА ВАШЕ ФОТО ⬇️⬇️⬇️ */
+            background-image: url('000.jpg');
+            border: 2px solid rgba(255,255,255,0.1);
+            animation: rotate-art 8s linear infinite;
+            flex-shrink: 0;
+            animation-play-state: running;
+        }
+        .music-art.paused {
+            animation-play-state: paused;
+        }
+        .music-meta { flex: 1; margin-left: 14px; overflow: hidden; }
+        .music-meta h4 { font-size: 14px; font-weight: 600; color: #fff; }
+        .music-meta p { font-size: 12px; color: rgba(255,255,255,0.45); }
+        .music-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: 10px;
+        }
+        .music-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 20px;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: white;
+        }
+        .music-btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.1);
+        }
+        .v-container { display: flex; align-items: flex-end; gap: 3px; height: 16px; flex-shrink: 0; }
+        .v-bar { width: 3px; background: var(--accent-primary); border-radius: 4px; animation: bounce 0.8s infinite alternate; }
+
+        /* Notification */
+        .notif-brand {
+            width: 54px; height: 54px; border-radius: 18px;
+            background: linear-gradient(135deg, #a855f7, #6366f1);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .notif-text { margin-left: 16px; flex: 1; overflow: hidden; }
+        .notif-text b { font-size: 15px; color: #fff; display: block; margin-bottom: 2px; }
+        .notif-text span { font-size: 13px; color: rgba(255,255,255,0.6); }
+
+        /* Focus (Производительность) — детальный вид */
+        .focus-icon-box {
+            width: 32px; height: 32px; border-radius: 10px;
+            background: linear-gradient(135deg, #a855f7, #6366f1);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 15px var(--accent-glow);
+            flex-shrink: 0;
+        }
+        .focus-text { margin-left: 12px; }
+        .focus-text .title { font-size: 13px; font-weight: 700; color: #fff; }
+        .focus-text .sub { font-size: 10px; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 1px; }
+
+        /* FaceID */
+        .content-faceid { justify-content: center; padding: 0; }
+        .animate-scan { animation: scan 2s infinite ease-in-out; }
+        @keyframes scan { 
+            0% { transform: scale(1); opacity: 0.5; } 
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.5; }
+        }
+
+        /* Timer */
+        .timer-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; flex: 1; text-align: center; color: #fff; }
+
+        /* Charge (Зарядка) — детальный вид с прогрессом */
+        .charge-container {
+            display: flex; align-items: center; width: 100%; gap: 12px;
+        }
+        .charge-bar-bg {
+            flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden;
+        }
+        .charge-bar-fill {
+            width: 85%; height: 100%; background: var(--charge-green);
+            box-shadow: 0 0 10px var(--charge-green);
+            border-radius: 10px;
+        }
+        .charge-pct { font-size: 14px; font-weight: 700; color: var(--charge-green); }
+
+        /* Анимации */
+        @keyframes bounce { 0% { height: 4px; } 100% { height: 16px; } }
+
+        /* Демо-панель — ВСЕ 8 КНОПОК */
+        .demo-controls {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+            max-width: 500px; width: 90%; margin-top: 250px; z-index: 10;
+        }
+        .demo-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.6);
+            padding: 12px; border-radius: 16px;
+            font-size: 12px; font-weight: 500; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .demo-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .demo-btn.active-btn { background: #fff; color: #000; font-weight: 700; border-color: #fff; }
+        .full-btn { grid-column: span 4; background: var(--accent-primary); color: #fff; font-weight: 600; border: none; margin-top: 5px; }
+
+        /* Аудиоплеер (скрытый) */
+        #audio-player {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Скрытый аудиоплеер -->
+    <audio id="audio-player" controls style="display: none;">
+        <!-- ⬇️⬇️⬇️ СЮДА ВСТАВЬТЕ ССЫЛКУ НА ВАШ АУДИОФАЙЛ ⬇️⬇️⬇️ -->
+        <source src="s0rrow.mp3" type="audio/mpeg">
+        Ваш браузер не поддерживает аудио.
+    </audio>
+
+    <div class="island-wrapper">
+        <div id="island" class="island state-idle">
+            
+            <!-- Idle -->
+            <div id="content-idle" class="content content-idle">
+                <div class="dot"></div>
+                <div style="width: 35px; height: 5px; border-radius: 10px; background: rgba(255,255,255,0.15);"></div>
+            </div>
+
+            <!-- Music (с крутящейся обложкой и элементами управления) -->
+            <div id="content-music" class="content content-music">
+                <div class="music-art" id="music-art"></div>
+                <div class="music-meta">
+                    <h4 id="song-title">Stalk ur socials</h4>
+                    <p id="song-artist">s0rrow</p>
+                </div>
+                <div class="music-controls">
+                    <button class="music-btn" id="play-pause-btn" onclick="togglePlay()">
+                        <i data-lucide="play" id="play-icon" size="16"></i>
+                    </button>
+                </div>
+                <div class="v-container">
+                    <div class="v-bar" style="animation-delay: 0s;"></div>
+                    <div class="v-bar" style="animation-delay: 0.2s;"></div>
+                    <div class="v-bar" style="animation-delay: 0.1s;"></div>
+                </div>
+            </div>
+
+            <!-- Notification -->
+            <div id="content-notif" class="content content-notif">
+                <div class="notif-brand">
+                    <i data-lucide="message-square" size="24" color="#fff"></i>
+                </div>
+                <div class="notif-text">
+                    <b>Облочко</b>
+                    <span>Йолька🎄</span>
+                </div>
+            </div>
+
+            <!-- Focus (Производительность) — детальный вид -->
+            <div id="content-focus" class="content content-focus">
+                <div class="focus-icon-box">
+                    <i data-lucide="zap" size="18" color="#fff" fill="#fff"></i>
+                </div>
+                <div class="focus-text">
+                    <div class="title">Multi-Turbo</div>
+                    <div class="sub">Оптимизировано</div>
+                </div>
+            </div>
+
+            <!-- FaceID -->
+            <div id="content-faceid" class="content content-faceid">
+                <i data-lucide="scan-face" size="28" color="var(--accent-primary)" class="animate-scan"></i>
+            </div>
+
+            <!-- Timer -->
+            <div id="content-timer" class="content content-timer">
+                <i data-lucide="timer" size="20" color="rgba(255,255,255,0.5)"></i>
+                <span class="timer-val">04:59</span>
+                <div style="width: 40px; height: 24px; border-radius: 12px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center;">
+                    <i data-lucide="pause" size="12" fill="white"></i>
+                </div>
+            </div>
+
+            <!-- Charge (Зарядка) — детальный вид с прогрессом -->
+            <div id="content-charge" class="content content-charge">
+                <div class="charge-container">
+                    <i data-lucide="zap" size="20" color="var(--charge-green)" fill="var(--charge-green)"></i>
+                    <div class="charge-bar-bg">
+                        <div class="charge-bar-fill"></div>
+                    </div>
+                    <span class="charge-pct">85%</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ВСЕ 8 КНОПОК: Ожидание, Музыка, Мессенджер, Турбо, FaceID, Таймер, Зарядка, Перезапуск -->
+    <div class="demo-controls">
+        <button class="demo-btn" onclick="changeState('idle', this)">Ожидание</button>
+        <button class="demo-btn" onclick="changeState('music', this)">Музыка</button>
+        <button class="demo-btn" onclick="changeState('notif', this)">Мессенджер</button>
+        <button class="demo-btn" onclick="changeState('focus', this)">Турбо</button>
+        <button class="demo-btn" onclick="changeState('faceid', this)">FaceID</button>
+        <button class="demo-btn" onclick="changeState('timer', this)">Таймер</button>
+        <button class="demo-btn" onclick="changeState('charge', this)">Зарядка</button>
+        <button class="demo-btn full-btn" onclick="resetAnimation()">Перезапустить вылет</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const island = document.getElementById('island');
+            const contents = {
+                idle: document.getElementById('content-idle'),
+                music: document.getElementById('content-music'),
+                notif: document.getElementById('content-notif'),
+                focus: document.getElementById('content-focus'),
+                faceid: document.getElementById('content-faceid'),
+                timer: document.getElementById('content-timer'),
+                charge: document.getElementById('content-charge')
+            };
+
+            // Инициализация иконок Lucide
+            if (window.lucide) window.lucide.createIcons();
+
+            // Эффект рассеивания при клике
+            island.addEventListener('mousedown', function(e) {
+                const ripple = document.createElement('div');
+                ripple.classList.add('ripple');
+                this.appendChild(ripple);
+                
+                const rect = this.getBoundingClientRect();
+                const size = Math.max(rect.width, rect.height);
+                ripple.style.width = ripple.style.height = size + 'px';
+                
+                const x = e.clientX - rect.left - size/2;
+                const y = e.clientY - rect.top - size/2;
+                ripple.style.left = x + 'px';
+                ripple.style.top = y + 'px';
+                
+                setTimeout(() => ripple.remove(), 800);
+                
+                this.style.transform = 'scale(0.96) translateY(2px)';
+                setTimeout(() => { if(!this.classList.contains('ready')) return; this.style.transform = 'scale(1) translateY(0)'; }, 150);
+            });
+
+            setTimeout(() => {
+                island.classList.add('ready');
+                window.changeState('idle', document.querySelector('.demo-btn'));
+            }, 600);
+
+            window.changeState = function(state, btn) {
+                island.classList.remove('active-content');
+                Object.values(contents).forEach(c => c.classList.remove('visible'));
+
+                setTimeout(() => {
+                    island.classList.remove('state-idle', 'state-music', 'state-notif', 'state-focus', 'state-faceid', 'state-timer', 'state-charge');
+                    island.classList.add(`state-${state}`);
+                    
+                    setTimeout(() => {
+                        contents[state].classList.add('visible');
+                        island.classList.add('active-content');
+                        
+                        // Если переключились на музыку, обновляем иконку play/pause
+                        if (state === 'music') {
+                            updatePlayButton();
+                        }
+                    }, 50);
+
+                    document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('active-btn'));
+                    if (btn) btn.classList.add('active-btn');
+                }, 80);
+
+                if (navigator.vibrate) navigator.vibrate(8);
+            };
+
+            window.resetAnimation = function() {
+                island.classList.remove('ready');
+                setTimeout(() => island.classList.add('ready'), 400);
+            };
+
+            // Аудиоплеер
+            const audio = document.getElementById('audio-player');
+            const playIcon = document.getElementById('play-icon');
+            const musicArt = document.getElementById('music-art');
+
+            window.togglePlay = function() {
+                if (audio.paused) {
+                    audio.play();
+                    playIcon.setAttribute('data-lucide', 'pause');
+                    musicArt.classList.remove('paused');
+                } else {
+                    audio.pause();
+                    playIcon.setAttribute('data-lucide', 'play');
+                    musicArt.classList.add('paused');
+                }
+                if (window.lucide) window.lucide.createIcons();
+            };
+
+            function updatePlayButton() {
+                if (audio.paused) {
+                    playIcon.setAttribute('data-lucide', 'play');
+                    musicArt.classList.add('paused');
+                } else {
+                    playIcon.setAttribute('data-lucide', 'pause');
+                    musicArt.classList.remove('paused');
+                }
+                if (window.lucide) window.lucide.createIcons();
+            }
+
+            // Обновляем иконку при окончании трека
+            audio.addEventListener('ended', function() {
+                playIcon.setAttribute('data-lucide', 'play');
+                musicArt.classList.add('paused');
+                if (window.lucide) window.lucide.createIcons();
+            });
+        });
+    </script>
+</body>
+</html>
